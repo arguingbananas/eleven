@@ -4,3 +4,8 @@ __pycache__/
 audio/
 
 generated/
+
+# Local CI venv and tooling
+.venv-ci/
+gitleaks-report.json
+.githooks/
