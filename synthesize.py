@@ -193,6 +193,7 @@ def main(argv=None):
     group.add_argument('--infile', help='Text file to read input from')
     parser.add_argument('--voice', default='alloy', help='Voice id to use (default: alloy)')
     parser.add_argument('--voice-name', action='store_true', help='Print resolved voice_id for the provided --voice before synthesizing')
+    parser.add_argument('--show-only', action='store_true', help='Only print the resolved voice_id and exit (do not synthesize)')
     parser.add_argument('--list-voices', action='store_true', help='List available voices and exit')
     parser.add_argument('--debug-env', action='store_true', help='Print non-sensitive env debug info and exit')
     parser.add_argument('--format', choices=['mp3', 'wav', 'ogg'], default='mp3', help='Output audio format (default: mp3)')
@@ -254,6 +255,10 @@ def main(argv=None):
     # If requested, print the resolved mapping for user confirmation
     if getattr(args, 'voice_name', False):
         print(f"Resolved voice id for '{original_voice}': {args.voice}")
+    if getattr(args, 'show_only', False):
+        # Print resolved id and exit without calling the TTS API
+        print(f"Show-only: resolved voice id for '{original_voice}': {args.voice}")
+        return
 
     # prefer SDK when available, otherwise HTTP
     if HAS_SDK:
