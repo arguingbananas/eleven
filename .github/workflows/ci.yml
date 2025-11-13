@@ -7,8 +7,23 @@ on:
     branches: [ master, main ]
 
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks secret scan
+        uses: zricethezav/gitleaks-action@v1
+        with:
+          args: '--path=. --redact --report-format=json'
+
   test:
     name: Run tests
+    needs: secret-scan
     runs-on: ubuntu-latest
     strategy:
       matrix:
