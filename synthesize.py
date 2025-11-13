@@ -296,16 +296,26 @@ def main(argv=None):
 
             if voice_label:
                 base = out_path.name
-                lower_base = base.lower()
-                # Do not add the prefix if the voice label already appears
-                # as a separate token in the filename (prefix, suffix, or delimited).
-                # Match boundaries like start, end, underscore, hyphen or dot.
+                # Normalize to format: voicename_description.ext
                 try:
-                    pattern = rf'(^|[_\-.]){re.escape(voice_label)}($|[_\-.])'
-                    if not re.search(pattern, lower_base):
-                        out_path = out_path.with_name(f"{voice_label}_{base}")
+                    stem = out_path.stem  # name without suffix
+                    suffix = out_path.suffix
+                    # remove occurrences of the voice_label from stem (as whole token)
+                    # allow separators _ - . and optional surrounding separators
+                    token_pattern = rf'([_\-.]?){re.escape(voice_label)}([_\-.]?)'
+                    # perform case-insensitive removal
+                    cleaned = re.sub(token_pattern, '_', stem, flags=re.IGNORECASE)
+                    # collapse multiple separators and trim
+                    cleaned = re.sub(r'[_\-.]+', '_', cleaned).strip('_')
+                    if cleaned:
+                        new_name = f"{voice_label}_{cleaned}{suffix}"
+                    else:
+                        # if removing the token left nothing, keep original stem as description
+                        new_name = f"{voice_label}_{stem}{suffix}"
+                    out_path = out_path.with_name(new_name)
                 except Exception:
-                    # Fallback to simple startswith check if regex fails for any reason
+                    # Fallback: simple prefix if anything goes wrong
+                    base = out_path.name
                     if not base.lower().startswith(f"{voice_label}_"):
                         out_path = out_path.with_name(f"{voice_label}_{base}")
     except Exception:
