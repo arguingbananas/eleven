@@ -10,3 +10,6 @@ generated/
 gitleaks-report.json
 .githooks/
 gitleaks-baseline.json
+
+# Local transcripts and generated speech-to-text outputs
+transcripts/
