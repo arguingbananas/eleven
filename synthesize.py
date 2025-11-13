@@ -193,6 +193,32 @@ def normalize_label(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
+def normalize_output_filename(voice_label: str, out_path: Path) -> Path:
+    """Return an output Path normalized to `voicename_description.ext`.
+
+    Removes occurrences of the voice_label from the original stem (as a
+    separate token using separators `_ - .`) and then composes
+    `voice_label_cleaned.ext`. If removal leaves an empty description, the
+    original stem is used as the description.
+    """
+    try:
+        stem = out_path.stem
+        suffix = out_path.suffix
+        token_pattern = rf'([_\-.]?){re.escape(voice_label)}([_\-.]?)'
+        cleaned = re.sub(token_pattern, '_', stem, flags=re.IGNORECASE)
+        cleaned = re.sub(r'[_\-.]+', '_', cleaned).strip('_')
+        if cleaned:
+            new_name = f"{voice_label}_{cleaned}{suffix}"
+        else:
+            new_name = f"{voice_label}_{stem}{suffix}"
+        return out_path.with_name(new_name)
+    except Exception:
+        base = out_path.name
+        if not base.lower().startswith(f"{voice_label}_"):
+            return out_path.with_name(f"{voice_label}_{base}")
+        return out_path
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Synthesize text to speech via Eleven Labs')
     group = parser.add_mutually_exclusive_group(required=False)
@@ -295,29 +321,7 @@ def main(argv=None):
                     voice_label = None
 
             if voice_label:
-                base = out_path.name
-                # Normalize to format: voicename_description.ext
-                try:
-                    stem = out_path.stem  # name without suffix
-                    suffix = out_path.suffix
-                    # remove occurrences of the voice_label from stem (as whole token)
-                    # allow separators _ - . and optional surrounding separators
-                    token_pattern = rf'([_\-.]?){re.escape(voice_label)}([_\-.]?)'
-                    # perform case-insensitive removal
-                    cleaned = re.sub(token_pattern, '_', stem, flags=re.IGNORECASE)
-                    # collapse multiple separators and trim
-                    cleaned = re.sub(r'[_\-.]+', '_', cleaned).strip('_')
-                    if cleaned:
-                        new_name = f"{voice_label}_{cleaned}{suffix}"
-                    else:
-                        # if removing the token left nothing, keep original stem as description
-                        new_name = f"{voice_label}_{stem}{suffix}"
-                    out_path = out_path.with_name(new_name)
-                except Exception:
-                    # Fallback: simple prefix if anything goes wrong
-                    base = out_path.name
-                    if not base.lower().startswith(f"{voice_label}_"):
-                        out_path = out_path.with_name(f"{voice_label}_{base}")
+                out_path = normalize_output_filename(voice_label, out_path)
     except Exception:
         # Don't fail synthesis over filename prefixing issues
         pass
