@@ -104,7 +104,8 @@ def transcribe_file(
             parts = parts._replace(query=urlencode(qs))
             endpoint = urlunparse(parts)
 
-        headers = {"Authorization": f"Bearer {api_key}"}
+        # Use the same API-key header the Eleven Labs REST endpoints expect
+        headers = {"xi-api-key": api_key}
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
             # Include the model id in the request body so the API accepts the request
