@@ -186,6 +186,13 @@ def resolve_voice_id(api_key: str, endpoint: str, voice_arg: str, prefer_sdk: bo
     return voice_arg
 
 
+def normalize_label(s: str) -> str:
+    """Return a normalized lowercase label with only a-z0-9 characters."""
+    if not s:
+        return ""
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Synthesize text to speech via Eleven Labs')
     group = parser.add_mutually_exclusive_group(required=False)
@@ -259,6 +266,41 @@ def main(argv=None):
         # Print resolved id and exit without calling the TTS API
         print(f"Show-only: resolved voice id for '{original_voice}': {args.voice}")
         return
+
+    # If output lives in `generated/`, prepend a normalized voice-name label
+    try:
+        out_parent = str(out_path.parent)
+        if 'generated' in out_parent.split(os.sep):
+            voice_label = None
+            # If user provided a friendly original name, prefer that
+            if original_voice and not re.match(r"^[A-Za-z0-9_-]{6,}$", original_voice):
+                voice_label = normalize_label(original_voice)
+            else:
+                # Try to look up the display name for the resolved voice id
+                try:
+                    voices = list_voices(api_key=api_key, endpoint=args.endpoint)
+                    if isinstance(voices, dict) and 'voices' in voices:
+                        voices = voices['voices']
+                    for v in voices:
+                        if isinstance(v, dict):
+                            vid = v.get('id') or v.get('voice_id')
+                            name = v.get('name') or v.get('voice_name')
+                        else:
+                            vid = getattr(v, 'id', None) or getattr(v, 'voice_id', None)
+                            name = getattr(v, 'name', None) or getattr(v, 'voice_name', None)
+                        if vid == args.voice and name:
+                            voice_label = normalize_label(name)
+                            break
+                except Exception:
+                    voice_label = None
+
+            if voice_label:
+                base = out_path.name
+                if not base.lower().startswith(f"{voice_label}_"):
+                    out_path = out_path.with_name(f"{voice_label}_{base}")
+    except Exception:
+        # Don't fail synthesis over filename prefixing issues
+        pass
 
     # prefer SDK when available, otherwise HTTP
     if HAS_SDK:
