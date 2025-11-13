@@ -1,5 +1,12 @@
 from pathlib import Path
-from eleven import synthesize
+import sys
+from pathlib import Path as P
+
+# Ensure repo root is importable so we can import synthesize.py as a module
+ROOT = P(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import synthesize
 
 
 def nm(label, fname):

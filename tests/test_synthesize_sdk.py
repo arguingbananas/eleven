@@ -29,8 +29,8 @@ def test_sdk_path_writes_file(tmp_path, monkeypatch):
     # Ensure synthesize will prefer SDK path
     monkeypatch.setattr(synthesize, '_eleven_sdk', fake_sdk)
     monkeypatch.setattr(synthesize, 'HAS_SDK', True)
-    # Set API key env var expected by the script
-    monkeypatch.setenv(synthesize.env_var_name, 'sk_test_abcdef123456')
+    # Set API key env var expected by the script (use a non-sensitive placeholder)
+    monkeypatch.setenv(synthesize.env_var_name, 'TEST_API_KEY_REDACTED')
 
     # Call main with arguments that cause SDK branch to run
     synthesize.main(["--text", "hello sdk", "--voice", "fakevoice", "--output", str(out)])

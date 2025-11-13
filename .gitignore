@@ -9,3 +9,4 @@ generated/
 .venv-ci/
 gitleaks-report.json
 .githooks/
+gitleaks-baseline.json
