@@ -62,8 +62,9 @@ def synthesize_via_http(text: str, api_key: str, voice: str, endpoint: str, out_
         'ogg': 'audio/ogg',
     }
     accept = mime_map.get(fmt, 'audio/mpeg')
+    # Eleven Labs expects the API key in the `xi-api-key` header for HTTP requests
     headers = {
-        'Authorization': f'Bearer {api_key}',
+        'xi-api-key': api_key,
         'Accept': accept,
         'Content-Type': 'application/json',
     }
@@ -89,7 +90,8 @@ def synthesize_via_http(text: str, api_key: str, voice: str, endpoint: str, out_
 
 def list_voices_via_http(api_key: str, endpoint: str):
     url = endpoint.rstrip('/') + '/v1/voices'
-    headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
+    # Use `xi-api-key` header for listing voices over HTTP
+    headers = {'xi-api-key': api_key, 'Accept': 'application/json'}
     r = requests.get(url, headers=headers, timeout=20)
     if r.status_code != 200:
         try:
