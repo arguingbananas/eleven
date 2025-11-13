@@ -63,36 +63,71 @@ def transcribe_file(
     force_http = str(os.environ.get("ELEVENLABS_FORCE_HTTP", "")).lower() in ("1", "true", "yes")
 
     # Prefer SDK when available and not explicitly forced to use HTTP
+    def _transcribe_via_http(file_path: str, api_key: str, endpoint: str, model: str) -> dict:
+        # HTTP fallback: append model as query param if provided
+        if model:
+            from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
+            parts = urlparse(endpoint)
+            qs = dict(parse_qsl(parts.query))
+            qs["model"] = model
+            parts = parts._replace(query=urlencode(qs))
+            endpoint_local = urlunparse(parts)
+        else:
+            endpoint_local = endpoint
+
+        headers = {"xi-api-key": api_key}
+        with open(file_path, "rb") as f:
+            files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
+            data = {"model_id": model} if model else None
+            resp = requests.post(endpoint_local, headers=headers, files=files, data=data, timeout=120)
+        try:
+            data = resp.json()
+        except ValueError:
+            raise RuntimeError(f"Non-JSON response (status {resp.status_code}): {resp.text}")
+        if not resp.ok:
+            raise RuntimeError(f"API error (status {resp.status_code}): {data}")
+        return data
+
+
     if _HAS_ELEVEN_SDK and not force_http:
         client = ElevenLabs(api_key=api_key)
         with open(file_path, "rb") as f:
             try:
                 resp = client.speech_to_text.convert(model_id=model, file=f)
             except Exception as e:
-                # If SDK provides structured ApiError, extract info for user
+                # If SDK provides structured ApiError, extract info for user and
+                # fall back to HTTP when the error is a 422 (invalid/unsupported model).
                 if ApiError is not None and isinstance(e, ApiError):
-                    body = getattr(e, "body", None)
                     status_code = getattr(e, "status_code", None)
-                    msg = None
-                    try:
-                        if isinstance(body, dict):
-                            detail = body.get("detail") or body
-                            if isinstance(detail, dict):
-                                msg = detail.get("message") or detail.get("error")
+                    # If validation error from server, retry via HTTP fallback
+                    if status_code == 422:
+                        print("Warning: SDK STT returned 422; retrying via HTTP fallback...", file=sys.stderr)
+                        data = _transcribe_via_http(file_path, api_key, endpoint, model)
+                    else:
+                        body = getattr(e, "body", None)
+                        msg = None
+                        try:
+                            if isinstance(body, dict):
+                                detail = body.get("detail") or body
+                                if isinstance(detail, dict):
+                                    msg = detail.get("message") or detail.get("error")
+                                else:
+                                    msg = str(detail)
                             else:
-                                msg = str(detail)
-                        else:
+                                msg = str(body)
+                        except Exception:
                             msg = str(body)
-                    except Exception:
-                        msg = str(body)
-                    raise RuntimeError(f"ElevenLabs API error (status={status_code}): {msg}") from e
-                # otherwise re-raise as a runtime error
-                raise RuntimeError(f"ElevenLabs SDK error: {e}") from e
-        try:
-            data = resp.dict()
-        except Exception:
-            # best-effort: try to use attr access
-            data = {"text": getattr(resp, "text", None)}
+                        raise RuntimeError(f"ElevenLabs API error (status={status_code}): {msg}") from e
+                else:
+                    # otherwise re-raise as a runtime error
+                    raise RuntimeError(f"ElevenLabs SDK error: {e}") from e
+        # If we didn't already set `data` from the HTTP retry path, convert SDK response
+        if 'data' not in locals():
+            try:
+                data = resp.dict()
+            except Exception:
+                data = {"text": getattr(resp, "text", None)}
     else:
         # HTTP fallback: append model as query param if provided
         if model:
