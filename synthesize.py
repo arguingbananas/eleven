@@ -142,6 +142,7 @@ def main(argv=None):
     group.add_argument('--infile', help='Text file to read input from')
     parser.add_argument('--voice', default='alloy', help='Voice id to use (default: alloy)')
     parser.add_argument('--list-voices', action='store_true', help='List available voices and exit')
+    parser.add_argument('--debug-env', action='store_true', help='Print non-sensitive env debug info and exit')
     parser.add_argument('--format', choices=['mp3', 'wav', 'ogg'], default='mp3', help='Output audio format (default: mp3)')
     parser.add_argument('--output', '-o', default='generated/output.mp3', help='Output audio path')
     parser.add_argument('--endpoint', default='https://api.elevenlabs.io', help='Eleven Labs API base endpoint')
@@ -149,6 +150,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     api_key = args.api_key or os.environ.get(env_var_name)
+
+    if args.debug_env:
+        present = 'yes' if api_key else 'no'
+        prefix = api_key[:4] if api_key else ''
+        length = len(api_key) if api_key else 0
+        print(f'Env var name: {env_var_name}')
+        print(f'Present: {present}')
+        print(f'Prefix: {prefix}')
+        print(f'Length: {length}')
+        return
+
     if not api_key:
         fail(f'Error: Eleven Labs API key required. Set {env_var_name} or pass --api-key.', code=2)
 
