@@ -107,7 +107,9 @@ def transcribe_file(
         headers = {"Authorization": f"Bearer {api_key}"}
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
-            resp = requests.post(endpoint, headers=headers, files=files, timeout=120)
+            # Include the model id in the request body so the API accepts the request
+            data = {"model_id": model} if model else None
+            resp = requests.post(endpoint, headers=headers, files=files, data=data, timeout=120)
         try:
             data = resp.json()
         except ValueError:
