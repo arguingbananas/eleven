@@ -137,12 +137,62 @@ def list_voices(api_key: str, endpoint: str, prefer_sdk: bool = True):
     return list_voices_via_http(api_key=api_key, endpoint=endpoint)
 
 
+def resolve_voice_id(api_key: str, endpoint: str, voice_arg: str, prefer_sdk: bool = True) -> str:
+    """Resolve a voice argument (id or name) to a voice_id.
+
+    - If `voice_arg` exactly matches a voice id, return it.
+    - Otherwise list available voices and try to match by `name` (exact or normalized).
+    - If no match is found, return the original `voice_arg` and let the API report an error.
+    """
+    if not voice_arg:
+        return voice_arg
+
+    try:
+        voices = list_voices(api_key=api_key, endpoint=endpoint, prefer_sdk=prefer_sdk)
+    except Exception:
+        return voice_arg
+
+    # Normalize helper: lowercase and remove non-alphanum
+    def norm(s: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", s.lower()) if s else ""
+
+    target_norm = norm(voice_arg)
+
+    # voices may be a dict with 'voices' or a list of dicts/objects
+    if isinstance(voices, dict) and 'voices' in voices:
+        voices = voices['voices']
+
+    for v in voices:
+        # support different API shapes: some responses use 'id', others 'voice_id'
+        if isinstance(v, dict):
+            vid = v.get('id') or v.get('voice_id')
+            name = v.get('name') or v.get('voice_name')
+        else:
+            vid = getattr(v, 'id', None) or getattr(v, 'voice_id', None)
+            name = getattr(v, 'name', None) or getattr(v, 'voice_name', None)
+        if not vid and not name:
+            continue
+        # exact id match
+        if vid == voice_arg:
+            return vid
+        # exact name match
+        if name and name == voice_arg:
+            return vid
+        # normalized name match
+        if name and norm(name) == target_norm:
+            return vid
+
+    # nothing matched; return original to let the server error if needed
+    return voice_arg
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Synthesize text to speech via Eleven Labs')
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--text', help='Text to synthesize (mutually exclusive with --infile)')
     group.add_argument('--infile', help='Text file to read input from')
     parser.add_argument('--voice', default='alloy', help='Voice id to use (default: alloy)')
+    parser.add_argument('--voice-name', action='store_true', help='Print resolved voice_id for the provided --voice before synthesizing')
     parser.add_argument('--list-voices', action='store_true', help='List available voices and exit')
     parser.add_argument('--debug-env', action='store_true', help='Print non-sensitive env debug info and exit')
     parser.add_argument('--format', choices=['mp3', 'wav', 'ogg'], default='mp3', help='Output audio format (default: mp3)')
@@ -194,6 +244,16 @@ def main(argv=None):
         # if provided extension doesn't match requested format, replace it
         if out_path.suffix.lower() != ('.' + fmt):
             out_path = out_path.with_suffix('.' + fmt)
+
+    # Resolve voice name -> voice_id if needed (accept friendly names)
+    original_voice = args.voice
+    resolved_voice = resolve_voice_id(api_key=api_key, endpoint=args.endpoint, voice_arg=original_voice)
+    if resolved_voice != original_voice:
+        # user passed a name that resolved to an id; use the id
+        args.voice = resolved_voice
+    # If requested, print the resolved mapping for user confirmation
+    if getattr(args, 'voice_name', False):
+        print(f"Resolved voice id for '{original_voice}': {args.voice}")
 
     # prefer SDK when available, otherwise HTTP
     if HAS_SDK:
