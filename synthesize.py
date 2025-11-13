@@ -54,11 +54,17 @@ def validate_key(key: str):
     return bool(API_KEY_RE.match(key))
 
 
-def synthesize_via_http(text: str, api_key: str, voice: str, endpoint: str, out_path: Path):
+def synthesize_via_http(text: str, api_key: str, voice: str, endpoint: str, out_path: Path, fmt: str = 'mp3'):
     url = endpoint.rstrip('/') + f"/v1/text-to-speech/{voice}"
+    mime_map = {
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'ogg': 'audio/ogg',
+    }
+    accept = mime_map.get(fmt, 'audio/mpeg')
     headers = {
         'Authorization': f'Bearer {api_key}',
-        'Accept': 'audio/mpeg',
+        'Accept': accept,
         'Content-Type': 'application/json',
     }
     payload = { 'text': text }
@@ -136,6 +142,7 @@ def main(argv=None):
     group.add_argument('--infile', help='Text file to read input from')
     parser.add_argument('--voice', default='alloy', help='Voice id to use (default: alloy)')
     parser.add_argument('--list-voices', action='store_true', help='List available voices and exit')
+    parser.add_argument('--format', choices=['mp3', 'wav', 'ogg'], default='mp3', help='Output audio format (default: mp3)')
     parser.add_argument('--output', '-o', default='generated/output.mp3', help='Output audio path')
     parser.add_argument('--endpoint', default='https://api.elevenlabs.io', help='Eleven Labs API base endpoint')
     parser.add_argument('--api-key', help=f'Eleven Labs API key (or set {env_var_name} env var)')
@@ -165,6 +172,14 @@ def main(argv=None):
     text = load_text(args)
 
     out_path = Path(args.output)
+    # ensure output extension matches selected format
+    fmt = args.format.lower() if getattr(args, 'format', None) else 'mp3'
+    if out_path.suffix == '':
+        out_path = out_path.with_suffix('.' + fmt)
+    else:
+        # if provided extension doesn't match requested format, replace it
+        if out_path.suffix.lower() != ('.' + fmt):
+            out_path = out_path.with_suffix('.' + fmt)
 
     # prefer SDK when available, otherwise HTTP
     if HAS_SDK:
@@ -177,7 +192,11 @@ def main(argv=None):
                     for meth in ('synthesize', 'speak', 'generate'):
                         fn = getattr(tts, meth, None)
                         if callable(fn):
-                            res = fn(text=text, voice= args.voice)
+                            # try passing format if the SDK method accepts it
+                            try:
+                                res = fn(text=text, voice=args.voice, format=fmt)
+                            except TypeError:
+                                res = fn(text=text, voice=args.voice)
                             if isinstance(res, (bytes, bytearray)):
                                 out_path.parent.mkdir(parents=True, exist_ok=True)
                                 out_path.write_bytes(res)
