@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Simple pre-commit hook to prevent committing obvious secrets.
+# Checks staged files for common secret patterns and rejects the commit
+# if any matches are found. Also prevents committing a `.env` file.
+
+PATTERNS=(
+  'sk_[A-Za-z0-9_\-]\{8,\}'
+  '-----BEGIN PRIVATE KEY-----'
+  'AKIA[0-9A-Z]\{16\}'
+  'ELEVENLABS_API_KEY'
+)
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM || true)
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+
+for f in $staged_files; do
+  # refuse `.env` explicitly
+  if [ "$f" = ".env" ]; then
+    echo "Error: .env is not allowed to be committed. Add secrets to .env and ensure it's listed in .gitignore." >&2
+    exit 1
+  fi
+
+  # skip large/binary files heuristically
+  if git show :"$f" | head -c 8000 | grep -Iq "\x00"; then
+    continue
+  fi
+
+  # examine staged contents for patterns
+  for pat in "${PATTERNS[@]}"; do
+    if git show :"$f" | grep -En -e "$pat" >/dev/null 2>&1; then
+      echo "Error: Found potential secret in staged file '$f' (pattern: $pat)." >&2
+      echo "Remove the secret from the file and use environment variables or GitHub secrets instead." >&2
+      exit 1
+    fi
+  done
+done
+
+exit 0

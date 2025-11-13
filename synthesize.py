@@ -296,8 +296,18 @@ def main(argv=None):
 
             if voice_label:
                 base = out_path.name
-                if not base.lower().startswith(f"{voice_label}_"):
-                    out_path = out_path.with_name(f"{voice_label}_{base}")
+                lower_base = base.lower()
+                # Do not add the prefix if the voice label already appears
+                # as a separate token in the filename (prefix, suffix, or delimited).
+                # Match boundaries like start, end, underscore, hyphen or dot.
+                try:
+                    pattern = rf'(^|[_\-.]){re.escape(voice_label)}($|[_\-.])'
+                    if not re.search(pattern, lower_base):
+                        out_path = out_path.with_name(f"{voice_label}_{base}")
+                except Exception:
+                    # Fallback to simple startswith check if regex fails for any reason
+                    if not base.lower().startswith(f"{voice_label}_"):
+                        out_path = out_path.with_name(f"{voice_label}_{base}")
     except Exception:
         # Don't fail synthesis over filename prefixing issues
         pass
