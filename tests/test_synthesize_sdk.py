@@ -1,4 +1,11 @@
 from pathlib import Path
+import sys
+from pathlib import Path as P
+
+# ensure repo root is importable
+ROOT = P(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import synthesize
 
 
@@ -14,6 +21,8 @@ def test_sdk_path_writes_file(tmp_path, monkeypatch):
         def __init__(self, api_key=None):
             # expose attribute name the code looks for
             self.text_to_speech = FakeTTS()
+            # also provide a voices attribute so resolve_voice_id doesn't fall back to HTTP
+            self.voices = [{"id": "fake", "name": "fakevoice"}]
 
     fake_sdk = type("fake_sdk", (), {"Client": FakeClient})
 
