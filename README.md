@@ -42,6 +42,17 @@ Notes:
 - `--voice` accepts a voice ID or name. The script resolves friendly names when possible.
 - When the output path is under `generated/`, filenames are normalized to `voicename_description.ext`.
 - `--show-only` will print the resolved voice id without writing audio.
+ - `--voice` accepts a voice ID or name. The script resolves friendly names when possible.
+ - `--voice-name` prints the resolved voice information (both `id` and display `name`) and exits without synthesizing audio. Example:
+
+```bash
+# Print resolved voice id/name and exit (no synthesis)
+.venv/bin/python3 synthesize.py --voice "Andrew Cohan" --voice-name --api-key "sk_..."
+# Output: Resolved voice: id=AndrewCohan    name=Andrew Cohan
+```
+
+ - When the output path is under `generated/`, filenames are normalized to `voicename_description.ext`.
+ - `--show-only` is an alias that prints the resolved id and name and exits (backwards compatible).
 
 STT (speech → text) using `transcribe.py`:
 
